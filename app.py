@@ -1,755 +1,435 @@
 
+import os
 import streamlit as st
-import paho.mqtt.client as mqtt
-import json
-import time
-
-from bokeh.models import Button, CustomJS
+from bokeh.models.widgets import Button
+from bokeh.models import CustomJS
 from streamlit_bokeh_events import streamlit_bokeh_events
+from PIL import Image
+import time
+import paho.mqtt.client as paho
+import json
 
 
-# ==================================================
-# CONFIGURACIÓN
-# ==================================================
+# ==========================================
+# CONFIGURACIÓN DE LA PÁGINA
+# ==========================================
 
 st.set_page_config(
-    page_title="VozNaranja | Smart Home",
+    page_title="Casa Inteligente",
     page_icon="🏠",
-    layout="wide"
+    layout="centered"
 )
 
 
-# ==================================================
-# ESTILO VISUAL
-# ==================================================
+# ==========================================
+# FUNCIONES ORIGINALES
+# ==========================================
+
+def on_publish(client, userdata, result):
+    print("el dato ha sido publicado \n")
+    pass
+
+
+def on_message(client, userdata, message):
+    global message_received
+    time.sleep(2)
+    message_received = str(message.payload.decode("utf-8"))
+    st.write(message_received)
+
+
+# ==========================================
+# CONEXIÓN MQTT
+# ==========================================
+
+broker = "broker.mqttdashboard.com"
+port = 1883
+
+client1 = paho.Client("GIT-HUBC")
+client1.on_message = on_message
+
+
+# ==========================================
+# INTERFAZ VISUAL
+# ==========================================
 
 st.markdown("""
 <style>
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+/* FONDO NEGRO COMPLETO */
 
-.stApp {
-    background: #17191D;
-    font-family: 'DM Sans', sans-serif;
-    color: #F7F3EE;
+html,
+body,
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+[data-testid="stMainBlockContainer"],
+[data-testid="stHeader"] {
+    background-color: #09090D !important;
 }
 
-header {
+/* CONTENEDOR */
+
+[data-testid="stMainBlockContainer"] {
+    max-width: 850px;
+    padding-top: 55px;
+    padding-bottom: 40px;
+}
+
+/* OCULTAR ELEMENTOS DE STREAMLIT */
+
+#MainMenu {
     visibility: hidden;
 }
 
-.block-container {
-    max-width: 1450px;
-    padding-top: 1.5rem;
-    padding-bottom: 3rem;
+footer {
+    visibility: hidden;
 }
 
-h1, h2, h3, h4 {
+header {
+    background-color: #09090D !important;
+}
+
+/* TEXTOS GENERALES */
+
+.stApp,
+.stApp p,
+.stApp h1,
+.stApp h2,
+.stApp h3 {
     color: #FFFFFF;
 }
 
-p, label, span {
-    color: #C8C3BD;
-}
+/* ETIQUETA SUPERIOR */
 
-.hero {
-    background: linear-gradient(115deg, #E76F18, #F28C28 55%, #FFB45E);
-    border-radius: 24px;
-    padding: 30px 35px;
-    color: white;
-    margin-bottom: 25px;
-    box-shadow: 0 10px 35px rgba(242, 140, 40, 0.16);
-}
-
-.hero h1 {
-    color: white;
-    font-size: 38px;
-    font-weight: 800;
-    margin: 0;
-}
-
-.hero p {
-    color: #FFF6EC;
-    font-size: 15px;
-    margin-bottom: 0;
-}
-
-.eyebrow {
-    color: #FFB45E;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-.panel {
-    background: #22252B;
-    border: 1px solid #34373D;
-    border-radius: 20px;
-    padding: 22px;
-    margin-bottom: 17px;
-}
-
-.device-card {
-    background: #25282E;
-    border: 1px solid #393C42;
-    border-radius: 18px;
-    padding: 17px;
-    min-height: 130px;
-    margin-bottom: 8px;
-}
-
-.device-icon {
-    font-size: 27px;
-    margin-bottom: 10px;
-}
-
-.device-name {
-    color: #FFFFFF;
+.top-label {
+    color: #A78BFA;
+    font-size: 11px;
     font-weight: 700;
-    font-size: 16px;
-}
-
-.device-room {
-    color: #999DA5;
-    font-size: 12px;
-}
-
-.orange-panel {
-    background: linear-gradient(135deg, #442A1B, #2C2521);
-    border: 1px solid #81502E;
-    border-radius: 20px;
-    padding: 22px;
-    margin-bottom: 18px;
-}
-
-.voice-panel {
-    background: linear-gradient(145deg, #292B30, #202227);
-    border: 1px solid #474047;
-    border-radius: 24px;
-    padding: 27px;
+    letter-spacing: 4px;
     text-align: center;
     margin-bottom: 18px;
 }
 
-.voice-circle {
-    background: #F28C28;
-    width: 85px;
-    height: 85px;
-    border-radius: 50%;
-    margin: 10px auto 18px auto;
+/* TÍTULO */
+
+.main-title {
+    color: #FFFFFF;
+    font-size: 38px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: -1px;
+    margin-bottom: 10px;
+}
+
+.main-title span {
+    color: #A78BFA;
+}
+
+/* DESCRIPCIÓN */
+
+.main-description {
+    color: #96939F;
+    font-size: 14px;
+    text-align: center;
+    line-height: 1.8;
+    margin-bottom: 30px;
+}
+
+/* IMAGEN */
+
+[data-testid="stImage"] {
     display: flex;
-    align-items: center;
     justify-content: center;
-    font-size: 36px;
-    box-shadow: 0 0 0 12px rgba(242,140,40,0.10);
+    margin-top: 15px;
+    margin-bottom: 25px;
 }
 
-.status-dot {
-    display: inline-block;
-    width: 9px;
-    height: 9px;
-    background: #48C78E;
+/* SECCIÓN DEL ASISTENTE */
+
+.assistant-container {
+    background: #121218;
+    border: 1px solid #292532;
+    border-radius: 20px;
+    padding: 30px 20px;
+    text-align: center;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+
+/* ICONO */
+
+.mic-icon {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 18px auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #211A31;
+    border: 1px solid #59417E;
     border-radius: 50%;
-    margin-right: 7px;
+    font-size: 30px;
 }
 
-.stButton > button,
-.stButton > button p,
-.stButton > button span {
+/* TEXTO DEL ASISTENTE */
+
+.assistant-title {
+    color: #FFFFFF;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.assistant-description {
+    color: #96939F;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* BOTÓN BOKEH */
+
+.bk-btn,
+.bk-btn.bk-btn-primary {
+    background-color: #7952C7 !important;
+    background-image: none !important;
     color: #FFFFFF !important;
-    font-weight: 700 !important;
-}
-
-.stButton > button {
-    background: #E87924 !important;
-    border: 1px solid #E87924 !important;
+    border: 1px solid #A78BFA !important;
     border-radius: 12px !important;
-    min-height: 42px;
-    transition: all 0.2s ease;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    box-shadow: 0 4px 20px rgba(121,82,199,0.18) !important;
+    transition: all 0.2s ease !important;
 }
 
-.stButton > button:hover {
-    background: #C96017 !important;
-    border-color: #C96017 !important;
-    transform: translateY(-2px);
+/* EFECTO DEL BOTÓN */
+
+.bk-btn:hover,
+.bk-btn.bk-btn-primary:hover {
+    background-color: #916BE0 !important;
+    border-color: #C4B5FD !important;
+    color: #FFFFFF !important;
 }
 
-.stButton > button:focus {
-    box-shadow: 0 0 0 2px #FFB45E !important;
+/* RESULTADO */
+
+.result-label {
+    color: #A78BFA;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-top: 25px;
+    margin-bottom: 10px;
 }
 
-[data-testid="stSidebar"] {
-    background: #202329;
-    border-right: 1px solid #373A40;
+.result-container {
+    background: #15131C;
+    border: 1px solid #49356B;
+    border-radius: 12px;
+    padding: 18px;
+    color: #FFFFFF;
+    font-size: 15px;
+    text-align: center;
 }
 
-[data-testid="stSidebar"] h2,
-[data-testid="stSidebar"] h3 {
-    color: #FFAA52;
+/* MENSAJES */
+
+[data-testid="stAlert"] {
+    background: #15131C;
+    border-radius: 12px;
+    border: 1px solid #49356B;
+    color: #FFFFFF;
 }
 
-[data-testid="stSidebar"] p,
-[data-testid="stSidebar"] label {
-    color: #DDD5CD;
-}
+/* PIE DE PÁGINA */
 
-div[data-testid="stTextInput"] input,
-div[data-testid="stNumberInput"] input {
-    background: #292C32;
-    color: white;
-    border: 1px solid #484B51;
-    border-radius: 10px;
-}
-
-div[data-testid="stSelectbox"] div[data-baseweb="select"] {
-    background: #292C32;
-}
-
-div[data-testid="stMetric"] {
-    background: #25282E;
-    border: 1px solid #393C42;
-    border-radius: 16px;
+.footer {
+    color: #66616F;
+    font-size: 11px;
+    text-align: center;
+    letter-spacing: 2px;
+    margin-top: 45px;
     padding: 15px;
 }
 
-div[data-testid="stMetricLabel"] {
-    color: #B7B1AA;
-}
+/* MÓVILES */
 
-div[data-testid="stMetricValue"] {
-    color: #FFAA52;
-}
+@media (max-width: 600px) {
+    .main-title {
+        font-size: 29px;
+    }
 
-hr {
-    border-color: #393C42;
-}
+    [data-testid="stMainBlockContainer"] {
+        padding: 30px 15px;
+    }
 
-.small-note {
-    color: #999DA5;
-    font-size: 12px;
+    .assistant-container {
+        padding: 25px 15px;
+    }
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 
-# ==================================================
-# ESTADO DE LA APLICACIÓN
-# ==================================================
-
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-if "device_states" not in st.session_state:
-    st.session_state.device_states = {
-        "Luz principal": False,
-        "Lámpara": False,
-        "Ventilador": False,
-        "Televisor": False,
-        "Luz cocina": False,
-        "Aire acondicionado": False
-    }
-
-if "last_command" not in st.session_state:
-    st.session_state.last_command = ""
-
-if "mqtt_status" not in st.session_state:
-    st.session_state.mqtt_status = "Sin conexión"
-
-
-# ==================================================
-# CONEXIÓN MQTT
-# ==================================================
-
-@st.cache_resource
-def connect_mqtt(broker, port):
-
-    client = mqtt.Client(
-        client_id="VozNaranja_SmartHome"
-    )
-
-    client.connect(broker, int(port), 60)
-    client.loop_start()
-
-    return client
-
-
-def send_command(broker, port, topic, payload):
-
-    try:
-        client = connect_mqtt(broker, port)
-
-        message = json.dumps(payload, ensure_ascii=False)
-
-        result = client.publish(
-            topic,
-            message,
-            qos=0
-        )
-
-        if result.rc == mqtt.MQTT_ERR_SUCCESS:
-            return True, "Mensaje enviado correctamente."
-
-        return False, "No se pudo publicar el mensaje."
-
-    except Exception as error:
-        return False, str(error)
-
-
-def save_history(command, status):
-
-    st.session_state.history.insert(
-        0,
-        {
-            "command": command,
-            "time": time.strftime("%H:%M:%S"),
-            "status": status
-        }
-    )
-
-    st.session_state.history = st.session_state.history[:15]
-
-
-# ==================================================
-# BARRA LATERAL
-# ==================================================
-
-with st.sidebar:
-
-    st.markdown("## 🏠 VozNaranja")
-
-    st.caption("CENTRO DE CONTROL DOMÓTICO")
-
-    st.markdown("---")
-
-    st.markdown("### 🌐 Conexión MQTT")
-
-    broker = st.text_input(
-        "Servidor",
-        value="broker.mqttdashboard.com"
-    )
-
-    port = st.number_input(
-        "Puerto",
-        min_value=1,
-        max_value=65535,
-        value=1883
-    )
-
-    topic = st.text_input(
-        "Tópico",
-        value="voice_ctrl"
-    )
-
-    if st.button("🔌 Probar conexión", use_container_width=True):
-
-        try:
-            mqtt_client = connect_mqtt(broker, int(port))
-            st.session_state.mqtt_status = "Conectado"
-            st.success("Conexión MQTT establecida.")
-
-        except Exception as error:
-            st.session_state.mqtt_status = "Error de conexión"
-            st.error(str(error))
-
-    st.markdown("---")
-
-    st.markdown("### 🎙️ Voz")
-
-    language = st.selectbox(
-        "Idioma del reconocimiento",
-        ["Español", "Inglés"]
-    )
-
-    language_code = {
-        "Español": "es-ES",
-        "Inglés": "en-US"
-    }
-
-    st.markdown("---")
-
-    st.markdown("### 🏡 Habitaciones")
-
-    selected_room = st.radio(
-        "Selecciona una habitación",
-        ["Todas", "Sala", "Dormitorio", "Cocina"],
-        label_visibility="collapsed"
-    )
-
-    st.markdown("---")
-
-    st.caption("VozNaranja Smart Home · 2026")
-
-
-# ==================================================
-# ENCABEZADO PRINCIPAL
-# ==================================================
+# ==========================================
+# ENCABEZADO
+# ==========================================
 
 st.markdown("""
-<div class="hero">
-    <div style="font-size:13px; font-weight:800; letter-spacing:2px;">
-        SMART HOME EXPERIENCE
-    </div>
-    <h1>🏠 Bienvenido a tu hogar</h1>
-    <p>
-        Controla tus espacios, administra tus dispositivos
-        y automatiza tu casa con tu voz.
-    </p>
+<div class="top-label">
+    SMART HOME SYSTEM
+</div>
+
+<div class="main-title">
+    Casa <span>Inteligente</span>
+</div>
+
+<div class="main-description">
+    Controla tu hogar mediante comandos de voz.<br>
+    Una forma sencilla y moderna de interactuar con tu espacio.
 </div>
 """, unsafe_allow_html=True)
 
 
-# ==================================================
-# RESUMEN DE LA CASA
-# ==================================================
+# ==========================================
+# IMAGEN ORIGINAL
+# ==========================================
 
-total_devices = len(st.session_state.device_states)
+image = Image.open("voice_ctrl.jpg")
 
-active_devices = sum(
-    st.session_state.device_states.values()
-)
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Dispositivos", total_devices)
-
-with col2:
-    st.metric("Encendidos", active_devices)
-
-with col3:
-    st.metric("Apagados", total_devices - active_devices)
-
-with col4:
-    st.metric(
-        "Conexión MQTT",
-        "Activa" if st.session_state.mqtt_status == "Conectado"
-        else "Pendiente"
-    )
+st.image(image, width=190)
 
 
-st.markdown("")
-
-
-# ==================================================
+# ==========================================
 # ASISTENTE DE VOZ
-# ==================================================
+# ==========================================
 
-col_voice, col_info = st.columns([1.5, 1])
+st.markdown("""
+<div class="assistant-container">
 
-with col_voice:
-
-    st.markdown("""
-    <div class="voice-panel">
-        <div class="eyebrow">ASISTENTE PERSONAL</div>
-        <h2 style="margin-top:8px;">¿Qué necesitas en casa?</h2>
-        <p>Habla con tu hogar y dale una instrucción.</p>
-        <div class="voice-circle">🎙️</div>
-        <p style="color:#FFB45E; font-weight:700;">
-            Tu asistente está listo para escucharte
-        </p>
-        <p class="small-note">
-            Ejemplo: "Enciende la luz de la sala"
-        </p>
+    <div class="mic-icon">
+        🎙️
     </div>
-    """, unsafe_allow_html=True)
 
-    stt_button = Button(
-        label="🎙️ HABLAR CON MI CASA",
-        width=350,
-        height=60,
-        button_type="warning"
-    )
-
-    stt_button.js_on_event(
-        "button_click",
-        CustomJS(
-            args=dict(lang=language_code[language]),
-            code="""
-                const SpeechRecognition =
-                    window.SpeechRecognition ||
-                    window.webkitSpeechRecognition;
-
-                if (!SpeechRecognition) {
-                    document.dispatchEvent(
-                        new CustomEvent("VOICE_ERROR", {
-                            detail: "Navegador no compatible con reconocimiento de voz"
-                        })
-                    );
-                    return;
-                }
-
-                const recognition = new SpeechRecognition();
-
-                recognition.lang = lang;
-                recognition.continuous = false;
-                recognition.interimResults = false;
-
-                recognition.onresult = function(event) {
-
-                    const transcript =
-                        event.results[0][0].transcript;
-
-                    document.dispatchEvent(
-                        new CustomEvent("GET_TEXT", {
-                            detail: transcript
-                        })
-                    );
-                };
-
-                recognition.onerror = function(event) {
-
-                    document.dispatchEvent(
-                        new CustomEvent("VOICE_ERROR", {
-                            detail: event.error
-                        })
-                    );
-                };
-
-                recognition.start();
-            """
-        )
-    )
-
-    voice_result = streamlit_bokeh_events(
-        stt_button,
-        events=["GET_TEXT", "VOICE_ERROR"],
-        key="voice_listener",
-        refresh_on_update=True,
-        override_height=75,
-        debounce_time=0
-    )
-
-    if voice_result:
-
-        if "GET_TEXT" in voice_result:
-
-            command = voice_result.get("GET_TEXT", "").strip()
-
-            if command:
-
-                st.session_state.last_command = command
-
-                payload = {
-                    "Act1": command,
-                    "source": "voice"
-                }
-
-                success, message = send_command(
-                    broker,
-                    port,
-                    topic,
-                    payload
-                )
-
-                if success:
-
-                    st.session_state.mqtt_status = "Conectado"
-
-                    save_history(
-                        command,
-                        "Enviado"
-                    )
-
-                    st.success("Instrucción enviada a tu hogar.")
-
-                else:
-
-                    st.session_state.mqtt_status = "Error"
-
-                    st.error(message)
-
-        if "VOICE_ERROR" in voice_result:
-
-            st.error(
-                "Error de micrófono: "
-                + str(voice_result["VOICE_ERROR"])
-            )
-
-
-with col_info:
-
-    st.markdown("""
-    <div class="orange-panel">
-        <div class="eyebrow">ÚLTIMA INSTRUCCIÓN</div>
-        <h3 style="color:white;">💬 Tu voz tiene el control</h3>
+    <div class="assistant-title">
+        Control por voz
     </div>
-    """, unsafe_allow_html=True)
 
-    if st.session_state.last_command:
-
-        st.info(st.session_state.last_command)
-
-    else:
-
-        st.write("Todavía no has enviado ninguna instrucción.")
-
-    st.markdown("""
-    <div class="panel">
-        <h3>💡 Prueba estos comandos</h3>
-        <p>💡 Enciende la luz de la sala</p>
-        <p>🌙 Apaga la lámpara</p>
-        <p>🌀 Enciende el ventilador</p>
-        <p>📺 Apaga el televisor</p>
+    <div class="assistant-description">
+        Toca el botón para comenzar a escuchar.<br>
+        Di en voz alta la instrucción para tu hogar.
     </div>
-    """, unsafe_allow_html=True)
+
+</div>
+""", unsafe_allow_html=True)
 
 
-# ==================================================
-# DISPOSITIVOS POR HABITACIÓN
-# ==================================================
+# ==========================================
+# BOTÓN ORIGINAL
+# ==========================================
 
-st.markdown("---")
-
-st.markdown("## 🏡 Control de habitaciones")
-
-st.caption(
-    "Administra los dispositivos de cada espacio de tu hogar."
+stt_button = Button(
+    label="🎙️  INICIAR",
+    width=250,
+    height=55
 )
 
-rooms = {
-    "Sala": [
-        ("Luz principal", "💡", "Iluminación"),
-        ("Ventilador", "🌀", "Climatización"),
-        ("Televisor", "📺", "Entretenimiento")
-    ],
-    "Dormitorio": [
-        ("Lámpara", "🛋️", "Iluminación")
-    ],
-    "Cocina": [
-        ("Luz cocina", "💡", "Iluminación"),
-        ("Aire acondicionado", "❄️", "Climatización")
-    ]
-}
+stt_button.js_on_event("button_click", CustomJS(code="""
+    var recognition = new webkitSpeechRecognition();
 
-for room, devices in rooms.items():
+    recognition.continuous = true;
+    recognition.interimResults = true;
 
-    if selected_room != "Todas" and selected_room != room:
-        continue
+    recognition.onresult = function (e) {
 
-    st.markdown(f"### {room}")
+        var value = "";
 
-    columns = st.columns(3)
+        for (var i = e.resultIndex; i < e.results.length; ++i) {
 
-    for index, device in enumerate(devices):
+            if (e.results[i].isFinal) {
+                value += e.results[i][0].transcript;
+            }
 
-        name, emoji, category = device
-        current_state = st.session_state.device_states[name]
+        }
 
-        with columns[index % 3]:
+        if (value != "") {
 
-            st.markdown(
-                f"""
-                <div class="device-card">
-                    <div class="device-icon">{emoji}</div>
-                    <div class="device-name">{name}</div>
-                    <div class="device-room">{category}</div>
-                    <div style="margin-top:10px; color:{'#FFAA52' if current_state else '#A1A1A1'}; font-size:12px; font-weight:700;">
-                        {'● ENCENDIDO' if current_state else '● APAGADO'}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            document.dispatchEvent(
+                new CustomEvent("GET_TEXT", {
+                    detail: value
+                })
+            );
 
-            button_label = (
-                "Apagar dispositivo"
-                if current_state
-                else "Encender dispositivo"
-            )
+        }
+    }
 
-            if st.button(
-                button_label,
-                key=f"device_{name}",
-                use_container_width=True
-            ):
-
-                action = "OFF" if current_state else "ON"
-
-                payload = {
-                    "device": name,
-                    "room": room,
-                    "action": action,
-                    "source": "dashboard"
-                }
-
-                success, message = send_command(
-                    broker,
-                    port,
-                    topic,
-                    payload
-                )
-
-                if success:
-
-                    st.session_state.device_states[name] = not current_state
-                    st.session_state.mqtt_status = "Conectado"
-
-                    save_history(
-                        f"{action}: {name}",
-                        "Enviado"
-                    )
-
-                    st.rerun()
-
-                else:
-
-                    st.error(message)
+    recognition.start();
+"""))
 
 
-# ==================================================
-# HISTORIAL DE ACTIVIDAD
-# ==================================================
+# ==========================================
+# RECIBIR RESULTADO
+# ==========================================
 
-st.markdown("---")
+result = streamlit_bokeh_events(
+    stt_button,
+    events="GET_TEXT",
+    key="listen",
+    refresh_on_update=False,
+    override_height=75,
+    debounce_time=0
+)
 
-st.markdown("## 📋 Actividad reciente")
 
-if st.session_state.history:
+# ==========================================
+# ENVIAR COMANDO MQTT
+# ==========================================
 
-    for item in st.session_state.history[:8]:
+if result:
+
+    if "GET_TEXT" in result:
+
+        recognized_text = result.get("GET_TEXT").strip()
+
+        st.markdown("""
+        <div class="result-label">
+            COMANDO RECONOCIDO
+        </div>
+        """, unsafe_allow_html=True)
 
         st.markdown(
             f"""
-            <div class="panel" style="padding:14px 18px;">
-                <div style="display:flex; justify-content:space-between;">
-                    <span style="color:white; font-weight:700;">
-                        ⚡ {item['command']}
-                    </span>
-                    <span style="color:#FFAA52; font-size:12px;">
-                        {item['time']}
-                    </span>
-                </div>
-                <div class="small-note">
-                    Estado de envío: {item['status']}
-                </div>
+            <div class="result-container">
+                {recognized_text}
             </div>
             """,
             unsafe_allow_html=True
         )
 
-    if st.button("🧹 Limpiar actividad"):
-        st.session_state.history = []
-        st.rerun()
+        client1.on_publish = on_publish
 
-else:
+        client1.connect(broker, port)
 
-    st.info("Todavía no hay actividad registrada.")
+        message = json.dumps({
+            "Act1": recognized_text
+        })
+
+        ret = client1.publish("voice_ctrl", message)
+
+        client1.disconnect()
+
+    try:
+        os.mkdir("temp")
+    except:
+        pass
 
 
-# ==================================================
+# ==========================================
 # PIE DE PÁGINA
-# ==================================================
-
-st.markdown("---")
+# ==========================================
 
 st.markdown("""
-<div style="text-align:center; padding:20px;">
-    <div style="font-size:30px;">🏠 🧡</div>
-    <h3 style="color:#FFAA52;">VozNaranja Smart Home</h3>
-    <p class="small-note">
-        Tu hogar conectado. Tu voz, tu control.
-    </p>
+<div class="footer">
+    CASA INTELIGENTE · CONTROL POR VOZ
 </div>
 """, unsafe_allow_html=True)
