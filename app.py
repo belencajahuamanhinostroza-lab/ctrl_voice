@@ -8,8 +8,9 @@ from bokeh.models.widgets import Button
 from bokeh.models import CustomJS
 from streamlit_bokeh_events import streamlit_bokeh_events
 
+
 # ==========================================
-# CONFIGURACIÓN
+# 1. CONFIGURACIÓN
 # ==========================================
 
 st.set_page_config(
@@ -19,37 +20,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==========================================
-# VARIABLES MQTT
-# ==========================================
+DEFAULT_BROKER = "broker.mqttdashboard.com"
+DEFAULT_PORT = 1883
+DEFAULT_TOPIC = "voice_ctrl"
 
-broker = "broker.mqttdashboard.com"
-port = 1883
-topic = "voice_ctrl"
+DEFAULT_DEVICES = {
+    "Luz principal": False,
+    "Ventilador": False,
+    "Televisor": False,
+    "Lámpara": False,
+    "Luz de cocina": False,
+    "Aire acondicionado": False
+}
 
-# ==========================================
-# FUNCIONES MQTT
-# ==========================================
-
-def on_publish(client, userdata, result):
-    print("Mensaje publicado correctamente")
-
-
-def on_message(client, userdata, message):
-    global message_received
-    message_received = message.payload.decode("utf-8")
-
-
-client1 = paho.Client(client_id="VozNaranja_SmartHome")
-client1.on_message = on_message
-client1.on_publish = on_publish
 
 # ==========================================
-# ESTADOS DE STREAMLIT
+# 2. ESTADOS DE STREAMLIT
 # ==========================================
 
-if "mqtt_connected" not in st.session_state:
-    st.session_state.mqtt_connected = False
+if "device_states" not in st.session_state:
+    st.session_state.device_states = {}
+
+# Recuperar claves faltantes y conservar las existentes.
+for device, initial_state in DEFAULT_DEVICES.items():
+    st.session_state.device_states.setdefault(device, initial_state)
 
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -57,18 +51,90 @@ if "history" not in st.session_state:
 if "last_command" not in st.session_state:
     st.session_state.last_command = "Esperando instrucciones..."
 
-if "device_states" not in st.session_state:
-    st.session_state.device_states = {
-        "Luz principal": False,
-        "Ventilador": False,
-        "Televisor": False,
-        "Lámpara": False,
-        "Luz de cocina": False,
-        "Aire acondicionado": False
-    }
+if "mqtt_client" not in st.session_state:
+    st.session_state.mqtt_client = None
+
+if "mqtt_connected" not in st.session_state:
+    st.session_state.mqtt_connected = False
+
+if "voice_result" not in st.session_state:
+    st.session_state.voice_result = None
+
 
 # ==========================================
-# ESTILOS CSS
+# 3. FUNCIONES MQTT
+# ==========================================
+
+def connect_mqtt(broker, port):
+
+    try:
+        old_client = st.session_state.mqtt_client
+
+        if old_client is not None:
+            try:
+                old_client.loop_stop()
+                old_client.disconnect()
+            except Exception:
+                pass
+
+        client = paho.Client(
+            client_id="VozNaranja_SmartHome"
+        )
+
+        client.connect(broker, int(port), 60)
+        client.loop_start()
+
+        st.session_state.mqtt_client = client
+        st.session_state.mqtt_connected = True
+
+        return True
+
+    except Exception as error:
+
+        st.session_state.mqtt_connected = False
+        st.session_state.mqtt_client = None
+        st.session_state.mqtt_error = str(error)
+
+        return False
+
+
+def send_mqtt_message(topic, message):
+
+    client = st.session_state.mqtt_client
+
+    if client is None or not st.session_state.mqtt_connected:
+        return False
+
+    try:
+        payload = json.dumps(
+            {"Act1": message},
+            ensure_ascii=False
+        )
+
+        result = client.publish(topic, payload)
+
+        return result.rc == paho.MQTT_ERR_SUCCESS
+
+    except Exception as error:
+        st.session_state.mqtt_error = str(error)
+        return False
+
+
+def add_history(message):
+
+    st.session_state.history.insert(
+        0,
+        {
+            "time": time.strftime("%H:%M:%S"),
+            "message": message
+        }
+    )
+
+    st.session_state.history = st.session_state.history[:10]
+
+
+# ==========================================
+# 4. ESTILOS
 # ==========================================
 
 st.markdown("""
@@ -77,34 +143,67 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
 html, body, [class*="css"] {
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Poppins', sans-serif !important;
 }
+
+/* FONDO */
 
 .stApp {
-    background-color: #17191D;
-    color: #FFFFFF;
+    background-color: #17191D !important;
+    color: #FFFFFF !important;
 }
+
+/* TEXTOS GENERALES */
+
+.stApp p,
+.stApp label,
+.stApp span,
+.stApp li,
+.stApp small,
+.stApp div {
+    color: inherit;
+}
+
+.stMarkdown,
+.stMarkdown p,
+.stMarkdown li,
+.stMarkdown strong {
+    color: #F5F5F5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #FFFFFF !important;
+}
+
+[data-testid="stCaptionContainer"] p {
+    color: #B8BEC8 !important;
+}
+
+/* BARRA LATERAL */
 
 section[data-testid="stSidebar"] {
-    background: #22252B;
-    border-right: 1px solid #383D46;
+    background-color: #22252B !important;
+    border-right: 1px solid #393E48;
 }
 
-#MainMenu, footer {
-    visibility: hidden;
+section[data-testid="stSidebar"] * {
+    color: #FFFFFF !important;
 }
+
+/* ENCABEZADO */
 
 .main-header {
     font-size: 32px;
     font-weight: 700;
-    color: #FFFFFF;
+    color: #FFFFFF !important;
 }
 
 .subtitle {
-    color: #A0A5AE;
+    color: #C0C5CE !important;
     font-size: 14px;
-    margin-bottom: 20px;
 }
+
+/* BIENVENIDA */
 
 .welcome-card {
     background: linear-gradient(120deg, #30343D, #22252B);
@@ -115,15 +214,17 @@ section[data-testid="stSidebar"] {
 }
 
 .welcome-card h2 {
+    color: #FFFFFF !important;
     margin: 0;
-    color: white;
     font-size: 25px;
 }
 
 .welcome-card p {
-    color: #B4B8C0;
+    color: #D0D3DA !important;
     margin-bottom: 0;
 }
+
+/* MÉTRICAS */
 
 .metric-card {
     background: #252930;
@@ -134,23 +235,27 @@ section[data-testid="stSidebar"] {
 }
 
 .metric-title {
-    color: #A5AAB3;
+    color: #D0D3DA !important;
     font-size: 13px;
 }
 
 .metric-value {
-    color: #FF9845;
+    color: #FF9845 !important;
     font-size: 28px;
     font-weight: 700;
 }
 
+/* SECCIONES */
+
 .section-title {
-    color: white;
+    color: #FFFFFF !important;
     font-size: 21px;
     font-weight: 600;
     margin-top: 28px;
     margin-bottom: 15px;
 }
+
+/* ASISTENTE */
 
 .voice-card {
     background: linear-gradient(135deg, #302C29, #24272D);
@@ -168,13 +273,15 @@ section[data-testid="stSidebar"] {
 .voice-title {
     font-size: 22px;
     font-weight: 700;
-    color: #FFAA52;
+    color: #FFAA52 !important;
 }
 
 .voice-text {
-    color: #B8BDC5;
+    color: #D0D3DA !important;
     font-size: 13px;
 }
+
+/* DISPOSITIVOS */
 
 .device-card {
     background: #252930;
@@ -182,7 +289,7 @@ section[data-testid="stSidebar"] {
     border-radius: 16px;
     padding: 17px;
     margin-bottom: 10px;
-    min-height: 120px;
+    min-height: 125px;
 }
 
 .device-icon {
@@ -190,26 +297,28 @@ section[data-testid="stSidebar"] {
 }
 
 .device-title {
-    color: #FFFFFF;
+    color: #FFFFFF !important;
     font-weight: 600;
     font-size: 15px;
 }
 
 .device-room {
-    color: #9299A4;
+    color: #B8BEC8 !important;
     font-size: 12px;
 }
 
 .status-on {
-    color: #60D69B;
+    color: #60D69B !important;
     font-size: 12px;
     font-weight: 600;
 }
 
 .status-off {
-    color: #A4A8B0;
+    color: #C0C5CE !important;
     font-size: 12px;
 }
+
+/* HISTORIAL */
 
 .activity-card {
     background: #252930;
@@ -217,32 +326,62 @@ section[data-testid="stSidebar"] {
     border-radius: 14px;
     padding: 15px;
     margin-bottom: 8px;
+    color: #FFFFFF !important;
 }
 
+/* BOTONES */
+
 div.stButton > button {
-    background: #E87924;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
+    background: #E87924 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
     min-height: 42px;
 }
 
+div.stButton > button p {
+    color: #FFFFFF !important;
+}
+
 div.stButton > button:hover {
-    background: #FF9845;
-    color: white;
-    border: none;
+    background: #FF9845 !important;
+    color: #FFFFFF !important;
+}
+
+/* CAMPOS */
+
+div[data-testid="stTextInput"] input,
+div[data-testid="stNumberInput"] input {
+    background: #30343D !important;
+    color: #FFFFFF !important;
+    border: 1px solid #555C68 !important;
+}
+
+div[data-testid="stTextInput"] input::placeholder {
+    color: #B8BEC8 !important;
+}
+
+/* SELECTORES */
+
+div[data-baseweb="select"] * {
+    color: #FFFFFF !important;
 }
 
 hr {
-    border-color: #383D46;
+    border-color: #414650 !important;
+}
+
+#MainMenu, footer {
+    visibility: hidden;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
+
 # ==========================================
-# BARRA LATERAL
+# 5. BARRA LATERAL
 # ==========================================
 
 with st.sidebar:
@@ -252,46 +391,47 @@ with st.sidebar:
 
     st.divider()
 
-    st.markdown("### 📡 Conexión")
+    st.markdown("### 📡 Estado de conexión")
 
     if st.session_state.mqtt_connected:
-        st.success("● Sistema conectado")
+        st.success("Sistema MQTT conectado")
     else:
-        st.warning("● Esperando conexión")
+        st.warning("Esperando conexión MQTT")
 
-    st.markdown("### ⚙️ Configuración MQTT")
+    st.markdown("### ⚙️ Configuración")
 
     broker = st.text_input(
         "Servidor MQTT",
-        value=broker
+        value=DEFAULT_BROKER
     )
 
     port = st.number_input(
         "Puerto",
         min_value=1,
         max_value=65535,
-        value=1883
+        value=DEFAULT_PORT
     )
 
     topic = st.text_input(
-        "Tópico",
-        value=topic
+        "Tópico MQTT",
+        value=DEFAULT_TOPIC
     )
 
-    if st.button("Conectar al hogar", use_container_width=True):
+    if st.button(
+        "Conectar al hogar",
+        use_container_width=True
+    ):
 
-        try:
-            if not st.session_state.mqtt_connected:
-                client1.connect(broker, int(port), 60)
-                client1.loop_start()
-                st.session_state.mqtt_connected = True
-
-            st.success("Conexión establecida")
-
-        except Exception as error:
-            st.session_state.mqtt_connected = False
-            st.error("Error de conexión")
-            st.caption(str(error))
+        if connect_mqtt(broker, port):
+            st.success("¡Conexión establecida!")
+        else:
+            st.error("No se pudo conectar.")
+            st.caption(
+                st.session_state.get(
+                    "mqtt_error",
+                    "Error desconocido"
+                )
+            )
 
     st.divider()
 
@@ -303,10 +443,11 @@ with st.sidebar:
     st.divider()
 
     st.caption("VozNaranja Smart Home")
-    st.caption("Versión 1.0")
+    st.caption("Versión 1.1")
+
 
 # ==========================================
-# ENCABEZADO
+# 6. ENCABEZADO
 # ==========================================
 
 st.markdown(
@@ -326,12 +467,18 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+
 # ==========================================
-# MÉTRICAS
+# 7. MÉTRICAS
 # ==========================================
 
-total = len(st.session_state.device_states)
-active = sum(st.session_state.device_states.values())
+total = len(DEFAULT_DEVICES)
+
+active = sum(
+    bool(st.session_state.device_states.get(name, False))
+    for name in DEFAULT_DEVICES
+)
+
 inactive = total - active
 
 c1, c2, c3 = st.columns(3)
@@ -360,8 +507,9 @@ with c3:
     </div>
     """, unsafe_allow_html=True)
 
+
 # ==========================================
-# ASISTENTE DE VOZ
+# 8. ASISTENTE DE VOZ
 # ==========================================
 
 st.markdown(
@@ -374,7 +522,7 @@ st.markdown("""
     <div class="voice-icon">🏠 🎙️</div>
     <div class="voice-title">Habla con tu hogar</div>
     <p class="voice-text">
-        Presiona el botón y di lo que deseas hacer.
+        Presiona el micrófono y di lo que deseas hacer.
     </p>
     <p class="voice-text">
         Ejemplo: "Enciende la luz de la sala".
@@ -384,7 +532,7 @@ st.markdown("""
 
 st.write("")
 
-# Botón de reconocimiento original
+# BOTÓN ORIGINAL DE BOKEH
 
 stt_button = Button(
     label="🎙️ HABLAR CON MI CASA",
@@ -423,6 +571,7 @@ stt_button.js_on_event(
         };
 
         recognition.onresult = function(event) {
+
             var value = event.results[0][0].transcript;
 
             document.dispatchEvent(
@@ -453,8 +602,9 @@ result = streamlit_bokeh_events(
     debounce_time=0
 )
 
+
 # ==========================================
-# PROCESAR RECONOCIMIENTO
+# 9. PROCESAR COMANDO DE VOZ
 # ==========================================
 
 if result:
@@ -463,55 +613,46 @@ if result:
         st.info(result["VOICE_STATUS"])
 
     if "VOICE_ERROR" in result:
-        st.error("Error de micrófono: " + str(result["VOICE_ERROR"]))
+        st.error(
+            "Error de micrófono: " + str(result["VOICE_ERROR"])
+        )
 
     if "GET_TEXT" in result:
 
-        recognized_text = str(result["GET_TEXT"]).strip()
+        recognized_text = str(
+            result["GET_TEXT"]
+        ).strip()
 
         if recognized_text:
 
             st.session_state.last_command = recognized_text
 
             st.markdown("### 🗣️ Instrucción reconocida")
+
             st.success(recognized_text)
 
-            try:
-                if not st.session_state.mqtt_connected:
-                    client1.connect(broker, int(port), 60)
-                    client1.loop_start()
-                    st.session_state.mqtt_connected = True
+            # Conectar automáticamente si todavía no existe conexión.
 
-                message = json.dumps({
-                    "Act1": recognized_text
-                })
+            if not st.session_state.mqtt_connected:
 
-                ret = client1.publish(topic, message)
+                if not connect_mqtt(broker, port):
+                    st.error("No se pudo conectar al servidor MQTT.")
 
-                if ret.rc == paho.MQTT_ERR_SUCCESS:
+            if st.session_state.mqtt_connected:
 
-                    st.success("Orden enviada a tu hogar.")
+                if send_mqtt_message(topic, recognized_text):
 
-                    st.session_state.history.insert(
-                        0,
-                        {
-                            "time": time.strftime("%H:%M:%S"),
-                            "message": recognized_text
-                        }
-                    )
+                    st.success("¡Orden enviada a tu hogar!")
 
-                    st.session_state.history = (
-                        st.session_state.history[:10]
-                    )
+                    add_history(recognized_text)
 
                 else:
-                    st.error("No se pudo publicar el mensaje.")
 
-            except Exception as error:
-                st.error("Error MQTT: " + str(error))
+                    st.error("No se pudo enviar la instrucción MQTT.")
+
 
 # ==========================================
-# HABITACIONES Y DISPOSITIVOS
+# 10. DISPOSITIVOS Y HABITACIONES
 # ==========================================
 
 st.markdown(
@@ -544,11 +685,18 @@ for room, devices in rooms.items():
 
         with columns[i]:
 
-            state = st.session_state.device_states[name]
+            # get() evita el KeyError si falta una clave.
+
+            state = st.session_state.device_states.get(
+                name,
+                False
+            )
 
             status = "Encendido" if state else "Apagado"
 
-            status_class = "status-on" if state else "status-off"
+            status_class = (
+                "status-on" if state else "status-off"
+            )
 
             st.markdown(f"""
             <div class="device-card">
@@ -559,8 +707,9 @@ for room, devices in rooms.items():
             </div>
             """, unsafe_allow_html=True)
 
+
 # ==========================================
-# HISTORIAL DE ACTIVIDAD
+# 11. HISTORIAL
 # ==========================================
 
 st.markdown(
@@ -574,24 +723,27 @@ if st.session_state.history:
 
         st.markdown(f"""
         <div class="activity-card">
-            <span style="color:#FFAA52;">● {item['time']}</span>
+            <span style="color:#FFAA52;">
+                ● {item['time']}
+            </span>
             <br>
             {item['message']}
         </div>
         """, unsafe_allow_html=True)
 
 else:
+
     st.info("Aún no hay instrucciones registradas.")
 
+
 # ==========================================
-# PIE DE PÁGINA
+# 12. PIE DE PÁGINA
 # ==========================================
 
 st.divider()
 
 st.markdown("""
-<center style="color:#777E89;font-size:12px;">
+<center style="color:#B8BEC8;font-size:12px;">
 VozNaranja Smart Home · Control inteligente del hogar
 </center>
 """, unsafe_allow_html=True)
-
