@@ -6,11 +6,8 @@ from bokeh.models import CustomJS
 from streamlit_bokeh_events import streamlit_bokeh_events
 from PIL import Image
 import time
-import glob
 import paho.mqtt.client as paho
 import json
-from gtts import gTTS
-from googletrans import Translator
 
 
 # ==========================================
@@ -29,7 +26,7 @@ st.set_page_config(
 # ==========================================
 
 def on_publish(client, userdata, result):
-    print("el dato ha sido publicado \n")
+    print("el dato ha sido publicado")
     pass
 
 
@@ -54,7 +51,7 @@ client1.on_message = on_message
 st.markdown("""
 <style>
 
-/* FONDO COMPLETO */
+/* FONDO COMPLETO DE STREAMLIT */
 
 html, body, .stApp,
 [data-testid="stAppViewContainer"],
@@ -214,41 +211,6 @@ h1, h2, h3, p, label {
     margin-bottom: 15px;
 }
 
-/* BOTÓN STREAMLIT */
-
-div.stButton > button {
-    background: #8055D9 !important;
-
-    color: #FFFFFF !important;
-
-    border: 1px solid #A17BEF !important;
-
-    border-radius: 12px !important;
-
-    font-size: 15px !important;
-
-    font-weight: bold !important;
-
-    padding: 12px 20px !important;
-
-    transition: all 0.3s ease;
-}
-
-div.stButton > button:hover {
-    background: #9B75EB !important;
-
-    color: #FFFFFF !important;
-
-    border-color: #C4A9FF !important;
-
-    transform: scale(1.02);
-}
-
-div.stButton > button p {
-    color: #FFFFFF !important;
-    font-weight: bold !important;
-}
-
 /* BOTÓN BOKEH */
 
 .bk-btn,
@@ -335,7 +297,7 @@ st.markdown("""
 # IMAGEN ORIGINAL
 # ==========================================
 
-image = Image.open('voice_ctrl.jpg')
+image = Image.open("voice_ctrl.jpg")
 
 st.image(image, width=200)
 
@@ -375,31 +337,42 @@ stt_button = Button(
 )
 
 stt_button.js_on_event("button_click", CustomJS(code="""
-    var recognition = new webkitSpeechRecognition();
+    var SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
 
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    if (!SpeechRecognition) {
+        document.dispatchEvent(
+            new CustomEvent("VOICE_ERROR", {
+                detail: "Tu navegador no admite reconocimiento de voz."
+            })
+        );
+    } else {
+        var recognition = new SpeechRecognition();
 
-    recognition.lang = "es-PE";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "es-PE";
 
-    recognition.onresult = function (e) {
-        var value = "";
+        recognition.onresult = function (e) {
+            var value = "";
 
-        for (var i = e.resultIndex; i < e.results.length; ++i) {
-            if (e.results[i].isFinal) {
-                value += e.results[i][0].transcript;
+            for (var i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) {
+                    value += e.results[i][0].transcript;
+                }
             }
-        }
 
-        if (value != "") {
-            document.dispatchEvent(
-                new CustomEvent("GET_TEXT", {detail: value})
-            );
-        }
+            if (value != "") {
+                document.dispatchEvent(
+                    new CustomEvent("GET_TEXT", {detail: value})
+                );
+            }
+        };
+
+        recognition.start();
     }
-
-    recognition.start();
-    """))
+"""))
 
 
 # ==========================================
@@ -408,7 +381,7 @@ stt_button.js_on_event("button_click", CustomJS(code="""
 
 result = streamlit_bokeh_events(
     stt_button,
-    events="GET_TEXT",
+    events="GET_TEXT,VOICE_ERROR",
     key="listen",
     refresh_on_update=False,
     override_height=75,
@@ -422,41 +395,57 @@ result = streamlit_bokeh_events(
 
 if result:
 
+    if "VOICE_ERROR" in result:
+        st.error(str(result.get("VOICE_ERROR")))
+
     if "GET_TEXT" in result:
 
-        st.markdown("""
-        <div style="
-            background:#302448;
-            border:1px solid #7055A4;
-            border-radius:12px;
-            padding:15px;
-            margin-top:15px;
-            color:white;
-            text-align:center;
-        ">
-            <span style="font-size:14px;color:#C9B8F5;">
-                COMANDO RECONOCIDO
-            </span>
-        </div>
-        """, unsafe_allow_html=True)
+        recognized_text = result.get("GET_TEXT", "").strip()
 
-        st.write(result.get("GET_TEXT"))
+        if recognized_text:
 
-        client1.on_publish = on_publish
+            st.markdown("""
+            <div style="
+                background:#302448;
+                border:1px solid #7055A4;
+                border-radius:12px;
+                padding:15px;
+                margin-top:15px;
+                color:white;
+                text-align:center;
+            ">
+                <span style="font-size:14px;color:#C9B8F5;">
+                    COMANDO RECONOCIDO
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
-        client1.connect(broker, port)
+            st.write(recognized_text)
 
-        message = json.dumps({
-            "Act1": result.get("GET_TEXT").strip()
-        })
+            try:
+                client1.on_publish = on_publish
 
-        ret = client1.publish("voice_ctrl", message)
+                client1.connect(broker, port)
 
-        client1.disconnect()
+                message = json.dumps({
+                    "Act1": recognized_text
+                })
+
+                ret = client1.publish("voice_ctrl", message)
+
+                client1.disconnect()
+
+                if ret.rc == 0:
+                    st.success("¡Comando enviado a tu casa!")
+                else:
+                    st.error("No se pudo publicar el comando MQTT.")
+
+            except Exception as error:
+                st.error("Error de conexión MQTT: " + str(error))
 
     try:
         os.mkdir("temp")
-    except:
+    except FileExistsError:
         pass
 
 
