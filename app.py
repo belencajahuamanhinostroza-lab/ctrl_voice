@@ -1,72 +1,77 @@
 
 import os
-import streamlit as st
-from bokeh.models.widgets import Button
-from bokeh.models import CustomJS
-from streamlit_bokeh_events import streamlit_bokeh_events
-from PIL import Image
-import time
-import paho.mqtt.client as paho
 import json
+import time
+import streamlit as st
+import paho.mqtt.client as paho
+
+from PIL import Image
+from bokeh.models import Button, CustomJS
+from streamlit_bokeh_events import streamlit_bokeh_events
 
 
 # ==========================================
-# CONFIGURACIÓN DE LA PÁGINA
+# CONFIGURACIÓN
 # ==========================================
 
 st.set_page_config(
     page_title="Casa Inteligente",
     page_icon="🏠",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
 
 # ==========================================
-# CONEXIÓN MQTT ORIGINAL
+# MQTT
 # ==========================================
 
+broker = "broker.mqttdashboard.com"
+port = 1883
+
+
 def on_publish(client, userdata, result):
-    print("el dato ha sido publicado")
-    pass
+    print("El dato ha sido publicado")
 
 
 def on_message(client, userdata, message):
     global message_received
     time.sleep(2)
-    message_received = str(message.payload.decode("utf-8"))
-    st.write(message_received)
+    message_received = message.payload.decode("utf-8")
 
-
-broker = "broker.mqttdashboard.com"
-port = 1883
 
 client1 = paho.Client("GIT-HUBC")
 client1.on_message = on_message
 
 
 # ==========================================
-# DISEÑO CSS - CASA INTELIGENTE MORADA
+# DISEÑO GENERAL
 # ==========================================
 
 st.markdown("""
 <style>
 
-/* FONDO COMPLETO DE STREAMLIT */
+/* FONDO NEGRO COMPLETO */
 
-html, body, .stApp,
+html,
+body,
+.stApp,
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
 [data-testid="stMainBlockContainer"],
 [data-testid="stHeader"] {
-    background-color: #171225 !important;
+    background: #09090D !important;
 }
+
+/* CONTENEDOR PRINCIPAL */
 
 [data-testid="stMainBlockContainer"] {
-    padding-top: 2rem;
-    padding-bottom: 3rem;
+    max-width: 1000px;
+    padding-top: 35px;
+    padding-bottom: 40px;
 }
 
-/* OCULTAR ELEMENTOS */
+/* OCULTAR MENÚ Y PIE */
 
 #MainMenu {
     visibility: hidden;
@@ -77,129 +82,155 @@ footer {
 }
 
 header {
-    background: #171225 !important;
+    background: #09090D !important;
 }
 
-/* TEXTOS */
+/* TODOS LOS TEXTOS */
 
-h1, h2, h3, p, label {
-    color: #FFFFFF !important;
+.stApp,
+.stApp p,
+.stApp label,
+.stApp span,
+.stApp h1,
+.stApp h2,
+.stApp h3 {
+    color: #FFFFFF;
 }
 
-/* CONTENEDOR PRINCIPAL */
+/* ENCABEZADO */
 
-.main-container {
-    background: linear-gradient(
-        145deg,
-        #292044,
-        #201934
-    );
-
-    border: 1px solid #493B70;
-    border-radius: 25px;
-
-    padding: 35px 25px;
-
+.header-card {
+    background: linear-gradient(135deg, #17151F, #101015);
+    border: 1px solid #292532;
+    border-radius: 22px;
+    padding: 30px 20px;
     text-align: center;
-
-    box-shadow: 0px 10px 35px rgba(0,0,0,0.3);
-
     margin-bottom: 25px;
 }
 
-/* ETIQUETA SUPERIOR */
-
-.tag {
+.header-tag {
     display: inline-block;
-
-    background: #3B2D60;
-
-    color: #D8C7FF;
-
-    border: 1px solid #69539C;
-
+    color: #C5A8FF;
+    background: #251B37;
+    border: 1px solid #49356B;
     border-radius: 30px;
-
-    padding: 7px 16px;
-
-    font-size: 12px;
+    padding: 7px 15px;
+    font-size: 11px;
     font-weight: bold;
-
-    letter-spacing: 1px;
-
-    margin-bottom: 15px;
+    letter-spacing: 2px;
 }
 
-/* TÍTULO */
-
-.main-title {
+.header-title {
     color: #FFFFFF;
-
     font-size: 38px;
-
     font-weight: 800;
-
+    margin-top: 18px;
     margin-bottom: 8px;
 }
 
-.purple-text {
-    color: #B99AFF;
+.header-title span {
+    color: #A77BFF;
 }
 
-/* DESCRIPCIÓN */
-
-.description {
-    color: #C4BADB;
-
-    font-size: 15px;
-
+.header-description {
+    color: #AAA5B5;
+    font-size: 14px;
     line-height: 1.6;
-
-    margin-bottom: 20px;
 }
 
 /* TARJETA DEL ASISTENTE */
 
 .assistant-card {
-    background: #211A35;
-
-    border: 1px solid #493B70;
-
+    background: #141419;
+    border: 1px solid #302B3C;
     border-radius: 20px;
-
-    padding: 25px;
-
+    padding: 28px 20px;
     text-align: center;
-
     margin-top: 20px;
     margin-bottom: 15px;
 }
 
-/* ICONO */
-
 .assistant-icon {
-    font-size: 55px;
-    margin-bottom: 10px;
+    width: 75px;
+    height: 75px;
+    background: #241A35;
+    border: 1px solid #62449A;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+    font-size: 35px;
 }
-
-/* TEXTO DEL ASISTENTE */
 
 .assistant-title {
     color: #FFFFFF;
-
     font-size: 22px;
-
-    font-weight: bold;
-
-    margin-bottom: 8px;
+    font-weight: 700;
+    margin-top: 17px;
 }
 
 .assistant-description {
-    color: #BFB5D4;
-
+    color: #AAA5B5;
     font-size: 13px;
+    margin-top: 8px;
+    line-height: 1.6;
+}
 
-    line-height: 1.5;
+/* BOTÓN BOKEH */
+
+.bk-btn,
+.bk-btn.bk-btn-primary {
+    background-color: #8055D9 !important;
+    background-image: none !important;
+    color: #FFFFFF !important;
+    border: 1px solid #A77BFF !important;
+    border-radius: 13px !important;
+    font-weight: bold !important;
+    font-size: 14px !important;
+    box-shadow: 0 0 18px rgba(128,85,217,0.2) !important;
+}
+
+.bk-btn:hover,
+.bk-btn.bk-btn-primary:hover {
+    background-color: #996FF0 !important;
+    color: #FFFFFF !important;
+    border-color: #C2A7FF !important;
+}
+
+/* TARJETAS INFORMATIVAS */
+
+.info-card {
+    background: #141419;
+    border: 1px solid #292532;
+    border-radius: 15px;
+    padding: 18px;
+    margin-top: 18px;
+}
+
+.info-title {
+    color: #FFFFFF;
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.info-text {
+    color: #AAA5B5;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* COMANDO */
+
+.command-card {
+    background: #1D172A;
+    border: 1px solid #63469A;
+    border-radius: 13px;
+    padding: 17px;
+    color: #FFFFFF;
+    text-align: center;
+    margin-top: 15px;
 }
 
 /* IMAGEN */
@@ -211,57 +242,35 @@ h1, h2, h3, p, label {
     margin-bottom: 15px;
 }
 
-/* BOTÓN BOKEH */
+/* MENSAJES */
 
-.bk-btn,
-.bk-btn.bk-btn-primary {
-    background-color: #8055D9 !important;
-
-    background-image: none !important;
-
-    color: #FFFFFF !important;
-
-    border: 1px solid #A17BEF !important;
-
-    border-radius: 12px !important;
-
-    font-weight: bold !important;
-
-    font-size: 14px !important;
-
-    box-shadow: none !important;
+[data-testid="stAlert"] {
+    background: #17151F;
+    border: 1px solid #49356B;
+    color: #FFFFFF;
+    border-radius: 12px;
 }
 
-.bk-btn:hover,
-.bk-btn.bk-btn-primary:hover {
-    background-color: #9B75EB !important;
-
-    color: #FFFFFF !important;
-
-    border-color: #C4A9FF !important;
-}
-
-/* PIE DE PÁGINA */
+/* PIE */
 
 .footer {
+    color: #77717F;
+    font-size: 11px;
     text-align: center;
-
-    color: #887DA6;
-
-    font-size: 12px;
-
-    margin-top: 30px;
+    margin-top: 35px;
+    padding: 15px;
+    letter-spacing: 1px;
 }
 
 /* RESPONSIVE */
 
-@media (max-width: 600px) {
-    .main-title {
+@media(max-width: 600px) {
+    .header-title {
         font-size: 29px;
     }
 
-    .main-container {
-        padding: 25px 15px;
+    [data-testid="stMainBlockContainer"] {
+        padding: 20px 15px;
     }
 }
 
@@ -274,32 +283,30 @@ h1, h2, h3, p, label {
 # ==========================================
 
 st.markdown("""
-<div class="main-container">
+<div class="header-card">
+    <div class="header-tag">SMART HOME SYSTEM</div>
 
-    <div class="tag">
-        SMART HOME SYSTEM
+    <div class="header-title">
+        CASA <span>INTELIGENTE</span>
     </div>
 
-    <div class="main-title">
-        🏠 Casa <span class="purple-text">Inteligente</span>
+    <div class="header-description">
+        Tecnología que transforma tu hogar.<br>
+        Controla tus espacios mediante comandos de voz.
     </div>
-
-    <div class="description">
-        Controla tu hogar de una manera más fácil,
-        cómoda e inteligente mediante comandos de voz.
-    </div>
-
 </div>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# IMAGEN ORIGINAL
+# IMAGEN
 # ==========================================
 
-image = Image.open("voice_ctrl.jpg")
-
-st.image(image, width=200)
+try:
+    image = Image.open("voice_ctrl.jpg")
+    st.image(image, width=190)
+except FileNotFoundError:
+    st.warning("No se encontró el archivo voice_ctrl.jpg.")
 
 
 # ==========================================
@@ -309,17 +316,15 @@ st.image(image, width=200)
 st.markdown("""
 <div class="assistant-card">
 
-    <div class="assistant-icon">
-        🎙️
-    </div>
+    <div class="assistant-icon">🎙️</div>
 
     <div class="assistant-title">
         Asistente de voz
     </div>
 
     <div class="assistant-description">
-        Tu hogar está listo para escucharte.<br>
-        Presiona el botón y di el comando que deseas ejecutar.
+        Tu hogar está preparado para escucharte.<br>
+        Pulsa el botón y expresa el comando que deseas ejecutar.
     </div>
 
 </div>
@@ -327,7 +332,7 @@ st.markdown("""
 
 
 # ==========================================
-# BOTÓN ORIGINAL DE RECONOCIMIENTO
+# RECONOCIMIENTO DE VOZ
 # ==========================================
 
 stt_button = Button(
@@ -348,25 +353,33 @@ stt_button.js_on_event("button_click", CustomJS(code="""
             })
         );
     } else {
+
         var recognition = new SpeechRecognition();
 
+        recognition.lang = "es-PE";
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = "es-PE";
 
-        recognition.onresult = function (e) {
+        recognition.onresult = function(e) {
+
             var value = "";
 
             for (var i = e.resultIndex; i < e.results.length; ++i) {
+
                 if (e.results[i].isFinal) {
                     value += e.results[i][0].transcript;
                 }
+
             }
 
             if (value != "") {
+
                 document.dispatchEvent(
-                    new CustomEvent("GET_TEXT", {detail: value})
+                    new CustomEvent("GET_TEXT", {
+                        detail: value
+                    })
                 );
+
             }
         };
 
@@ -376,7 +389,7 @@ stt_button.js_on_event("button_click", CustomJS(code="""
 
 
 # ==========================================
-# RESULTADO DEL RECONOCIMIENTO
+# RECIBIR RESULTADOS
 # ==========================================
 
 result = streamlit_bokeh_events(
@@ -390,7 +403,7 @@ result = streamlit_bokeh_events(
 
 
 # ==========================================
-# ENVÍO MQTT ORIGINAL
+# PROCESAR COMANDO Y ENVIAR MQTT
 # ==========================================
 
 if result:
@@ -400,27 +413,28 @@ if result:
 
     if "GET_TEXT" in result:
 
-        recognized_text = result.get("GET_TEXT", "").strip()
+        recognized_text = str(
+            result.get("GET_TEXT", "")
+        ).strip()
 
         if recognized_text:
 
             st.markdown("""
-            <div style="
-                background:#302448;
-                border:1px solid #7055A4;
-                border-radius:12px;
-                padding:15px;
-                margin-top:15px;
-                color:white;
-                text-align:center;
-            ">
-                <span style="font-size:14px;color:#C9B8F5;">
+            <div class="command-card">
+                <div style="
+                    color:#B99AFF;
+                    font-size:11px;
+                    font-weight:bold;
+                    letter-spacing:2px;
+                ">
                     COMANDO RECONOCIDO
-                </span>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-            st.write(recognized_text)
+            st.markdown(
+                f"### 🗣️ {recognized_text}"
+            )
 
             try:
                 client1.on_publish = on_publish
@@ -431,22 +445,57 @@ if result:
                     "Act1": recognized_text
                 })
 
-                ret = client1.publish("voice_ctrl", message)
+                ret = client1.publish(
+                    "voice_ctrl",
+                    message
+                )
 
+                ret.wait_for_publish(timeout=5)
                 client1.disconnect()
 
                 if ret.rc == 0:
-                    st.success("¡Comando enviado a tu casa!")
+                    st.success("Comando enviado correctamente.")
                 else:
-                    st.error("No se pudo publicar el comando MQTT.")
+                    st.error("No se pudo enviar el comando MQTT.")
 
             except Exception as error:
-                st.error("Error de conexión MQTT: " + str(error))
+                st.error(
+                    "Error de conexión MQTT: " + str(error)
+                )
 
-    try:
-        os.mkdir("temp")
-    except FileExistsError:
-        pass
+            try:
+                os.mkdir("temp")
+            except FileExistsError:
+                pass
+
+
+# ==========================================
+# INFORMACIÓN DE CONEXIÓN
+# ==========================================
+
+st.markdown("""
+<div class="info-card">
+
+    <div class="info-title">
+        📡 Conexión del sistema
+    </div>
+
+    <div class="info-text">
+        <b style="color:#B99AFF;">Servidor:</b>
+        broker.mqttdashboard.com
+        <br>
+        <b style="color:#B99AFF;">Puerto:</b>
+        1883
+        <br>
+        <b style="color:#B99AFF;">Tópico:</b>
+        voice_ctrl
+        <br>
+        <b style="color:#B99AFF;">Protocolo:</b>
+        MQTT
+    </div>
+
+</div>
+""", unsafe_allow_html=True)
 
 
 # ==========================================
@@ -455,8 +504,8 @@ if result:
 
 st.markdown("""
 <div class="footer">
-    CASA INTELIGENTE · CONTROL POR VOZ
-    <br>
-    Tecnología para un hogar más conectado.
+    CASA INTELIGENTE · SMART HOME
+    <br><br>
+    CONTROL INTELIGENTE MEDIANTE VOZ
 </div>
 """, unsafe_allow_html=True)
